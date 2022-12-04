@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Container,
   InputGroup,
@@ -58,11 +58,15 @@ import {
 } from "@chakra-ui/icons";
 import WalletConnect from "@walletconnect/client";
 import { IClientMeta } from "@walletconnect/types";
-import { ethers } from "ethers";
+import { ethers, Signer } from "ethers";
 import axios from "axios";
 import { useSafeInject } from "../../contexts/SafeInjectContext";
 import Tab from "./Tab";
 import networkInfo from "./networkInfo";
+import Safe from '@safe-global/safe-core-sdk'
+import { OperationType, SafeTransactionDataPartial } from '@safe-global/safe-core-sdk-types'
+import EthersAdapter from '@safe-global/safe-ethers-lib'
+import SafeServiceClient from '@safe-global/safe-service-client'
 
 interface SafeDappInfo {
   id: number;
@@ -158,6 +162,104 @@ function Body() {
     }[]
   >([]);
 
+  const [privateKey, setPrivateKey] = useState<string>("");
+  const [signer, setSigner] = useState<Signer>();
+  
+  useEffect(() => {
+    if (privateKey !== "") {
+      console.log({realProvider})
+      setSigner(new ethers.Wallet(privateKey, realProvider))
+    }
+  }, [privateKey])
+
+
+  const [realProvider, setRealProvider] = useState<ethers.providers.JsonRpcProvider>(new ethers.providers.JsonRpcProvider(networkInfo[networkIndex].rpc));
+  useEffect(() => {
+    const rpc = networkInfo[networkIndex].rpc;
+    setRealProvider(new ethers.providers.JsonRpcProvider(rpc));
+  }, [networkIndex])
+
+  useEffect(() => {
+    if (tenderlyForkId !== "") {
+      // setProvider(new ethers.providers.JsonRpcProvider("https://rpc.tenderly.co/fork/" + tenderlyForkId));
+    }
+  }, [tenderlyForkId])
+
+  useEffect(() => {
+    setProvider(realProvider);
+  }, [realProvider])
+
+  const [ethAdapter, setEthAdapter] = useState<EthersAdapter>();
+
+  useEffect(() => {
+    console.log({provider, signer})
+    if (provider !== undefined && signer !== undefined) {
+      // Create EthAdapter instance
+      const newEthAdapter = new EthersAdapter({
+        // @ts-ignore
+        ethers,
+        // @ts-ignore
+        signerOrProvider: signer
+      });
+      setEthAdapter(newEthAdapter);
+    }
+  }, [provider, signer]);
+
+  const [txServiceUrl, setTxServiceUrl] = useState<string>(networkInfo[networkIndex].txService);
+  const [safe, setSafe] = useState<Safe>();
+  const [safeService, setSafeService] = useState<SafeServiceClient>();
+
+  useEffect(() => {
+    if (ethAdapter !== undefined) {
+      // Create Safe instance
+      Safe.create({
+        ethAdapter,
+        safeAddress: address
+      }).then(safe => {
+        // Create Safe Service Client instance
+        const service = new SafeServiceClient({
+          txServiceUrl: txServiceUrl,
+          ethAdapter
+        });
+
+        setSafe(safe);
+        setSafeService(service);
+      });  
+    }
+  }, [ethAdapter, address])
+
+  const queueSafeTxs = useCallback(() => {
+    console.log({safe, safeService, signer})
+    if (safe !== undefined && safeService !== undefined && signer !== undefined) {
+      const execute = async () => {
+        for (let tx of sendTxnData) {
+          // Create transaction
+          const safeTransactionData: SafeTransactionDataPartial = {
+            to:  ethers.utils.getAddress(tx.to),
+            value: tx.value, // 1 wei
+            data: tx.data,
+            operation: OperationType.Call
+          }
+          const safeTransaction = await safe.createTransaction({ safeTransactionData })
+  
+          const senderAddress = await signer.getAddress()
+          const safeTxHash = await safe.getTransactionHash(safeTransaction)
+          const signature = await safe.signTransactionHash(safeTxHash)
+  
+          await safeService.proposeTransaction({
+            safeAddress: address,
+            safeTransactionData: safeTransaction.data,
+            safeTxHash,
+            senderAddress,
+            senderSignature: signature.data
+          })
+        }
+      };
+
+      execute().then().catch();
+    }
+  }, [sendTxnData, safe, safeService, address]);
+
   useEffect(() => {
     const { session, _showAddress } = getCachedSession();
     if (session) {
@@ -188,11 +290,11 @@ function Body() {
       }
     }
 
-    setProvider(
-      new ethers.providers.JsonRpcProvider(
-        `https://mainnet.infura.io/v3/${process.env.REACT_APP_INFURA_KEY}`
-      )
-    );
+    // setProvider(
+    //   new ethers.providers.JsonRpcProvider(
+    //     `https://ethereum.publicnode.com`
+    //   )
+    // );
 
     const storedTenderlyForkId = localStorage.getItem("tenderlyForkId");
     setTenderlyForkId(storedTenderlyForkId ? storedTenderlyForkId : "");
@@ -219,6 +321,7 @@ function Body() {
 
   useEffect(() => {
     setRpcUrl(networkInfo[networkIndex].rpc);
+    setTxServiceUrl(networkInfo[networkIndex].txService);
   }, [networkIndex]);
 
   useEffect(() => {
@@ -678,6 +781,26 @@ function Body() {
           )}
         </InputGroup>
       </FormControl>
+      <br />
+      <FormControl>
+        <FormLabel>Enter Signer Key</FormLabel>
+        <InputGroup>
+          <Input
+            placeholder="xxx"
+            autoComplete="off"
+            // value="***"
+            onChange={(e) => {
+              const key = e.target.value;
+              // setShowAddress(_showAddress);
+              // setAddress(_showAddress);
+              // setIsAddressValid(true); // remove inValid warning when user types again
+              setPrivateKey(key);
+            }}
+            bg={bgColor[colorMode]}
+            isInvalid={!isAddressValid}
+          />
+        </InputGroup>
+      </FormControl>
       <Select
         mt={4}
         variant="filled"
@@ -1059,7 +1182,7 @@ function Body() {
             </HStack>
             <Flex flex="1" />
             {sendTxnData.length > 0 && (
-              <Button onClick={() => setSendTxnData([])}>
+              <Button onClick={queueSafeTxs}>
                 <CheckCircleIcon />
                 <Text pl="0.5rem">Queue</Text>
               </Button>
