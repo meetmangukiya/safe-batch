@@ -54,6 +54,7 @@ import {
   CopyIcon,
   DeleteIcon,
   CloseIcon,
+  CheckCircleIcon,
 } from "@chakra-ui/icons";
 import WalletConnect from "@walletconnect/client";
 import { IClientMeta } from "@walletconnect/types";
@@ -232,8 +233,8 @@ function Body() {
           return data;
         } else {
           return [
-            { ...newTxn, value: parseInt(newTxn.value, 16).toString() },
             ...data,
+            { ...newTxn, value: parseInt(newTxn.value, 16).toString() },
           ];
         }
       });
@@ -440,7 +441,7 @@ function Body() {
             if (data.some((d) => d.id === newTxn.id)) {
               return data;
             } else {
-              return [newTxn, ...data];
+              return [...data, newTxn];
             }
           });
 
@@ -1038,13 +1039,13 @@ function Body() {
               <Text fontSize={"xl"}>
                 {tableIsOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
               </Text>
-              <Heading size={"md"}>eth_sendTransactions</Heading>
+              <Heading size={"md"}>Batch</Heading>
               <Tooltip
                 label={
                   <>
                     <Text>
                       "eth_sendTransaction" requests by the dApp are shown here
-                      (latest on top)
+                      (latest on bottom)
                     </Text>
                   </>
                 }
@@ -1059,8 +1060,8 @@ function Body() {
             <Flex flex="1" />
             {sendTxnData.length > 0 && (
               <Button onClick={() => setSendTxnData([])}>
-                <DeleteIcon />
-                <Text pl="0.5rem">Clear</Text>
+                <CheckCircleIcon />
+                <Text pl="0.5rem">Queue</Text>
               </Button>
             )}
           </Flex>
