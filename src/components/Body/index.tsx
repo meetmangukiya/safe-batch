@@ -58,8 +58,8 @@ import {
 } from "@chakra-ui/icons";
 import WalletConnect from "@walletconnect/client";
 import { IClientMeta } from "@walletconnect/types";
-import { ethers, Signer } from "ethers";
-import axios from "axios";
+import { BigNumber, ethers, Signer } from "ethers";
+import axios, { AxiosResponse } from "axios";
 import { useSafeInject } from "../../contexts/SafeInjectContext";
 import Tab from "./Tab";
 import networkInfo from "./networkInfo";
@@ -67,6 +67,7 @@ import Safe from '@safe-global/safe-core-sdk'
 import { OperationType, SafeTransactionDataPartial } from '@safe-global/safe-core-sdk-types'
 import EthersAdapter from '@safe-global/safe-ethers-lib'
 import SafeServiceClient from '@safe-global/safe-service-client'
+import { v4 as uuid4 } from 'uuid';
 
 interface SafeDappInfo {
   id: number;
@@ -102,6 +103,36 @@ const TD = ({ txt }: { txt: string }) => (
     </HStack>
   </Td>
 );
+
+
+interface TenderlyForkCreateResponse {
+  fork: {
+    accounts: {
+      [key: string]: string
+    },
+    block_number: string,
+    description: string,
+    details: {
+      chain_config: {
+        chain_id: string,
+        type: string
+      }
+    },
+    json_rpc_url: string,
+    network_id: string,
+    name: string,
+    id: string
+  }
+}
+
+const createTenderlyFork = async (chainId: string, key: string): Promise<AxiosResponse<TenderlyForkCreateResponse>> => {
+  const url = `https://api.tenderly.co/api/v2/project/project/forks`;
+  const id = uuid4();
+  return axios.post(url, {description: id, name: id, network_id: chainId}, { headers: {'X-Access-Key': key } });
+}
+
+// const patchThresholdForSafeInFork = async () => {
+// }
 
 function Body() {
   const { colorMode } = useColorMode();
@@ -152,6 +183,7 @@ function Body() {
   const [iframeKey, setIframeKey] = useState(0); // hacky way to reload iframe when key changes
 
   const [tenderlyForkId, setTenderlyForkId] = useState("");
+  const [committedIndex, setCommittedIndex] = useState(-1);
   const [sendTxnData, setSendTxnData] = useState<
     {
       id: number;
@@ -162,9 +194,33 @@ function Body() {
     }[]
   >([]);
 
+  useEffect(() => {
+    if (provider !== undefined) {
+      const execute = async () => {
+        const totalTxs = sendTxnData.length;
+        let _committedIndex = committedIndex;
+        for (let i = _committedIndex + 1; i < sendTxnData.length; i++) {
+          let tx = sendTxnData[i];
+          console.log({tx})
+          await provider.send('eth_sendTransaction', [{
+            from: tx.from,
+            to: tx.to,
+            data: tx.data,
+            value: ethers.utils.hexlify(BigNumber.from(tx.value)),
+            gas: ethers.utils.hexlify(30_000_000),
+            gasPrice: ethers.utils.hexlify(0)
+          }]);
+        }  
+      }
+
+      execute().then(() => console.log("simulated txs on the fork")).catch(err => console.log("simulation failed", err));
+    }
+  }, [sendTxnData])
+
   const [privateKey, setPrivateKey] = useState<string>("");
   const [signer, setSigner] = useState<Signer>();
-  
+  const [tenderlyKey, setTenderlyKey] = useState<string>("");
+
   useEffect(() => {
     if (privateKey !== "" && privateKey.length === 64) {
       console.log({realProvider})
@@ -181,7 +237,7 @@ function Body() {
 
   useEffect(() => {
     if (tenderlyForkId !== "") {
-      // setProvider(new ethers.providers.JsonRpcProvider("https://rpc.tenderly.co/fork/" + tenderlyForkId));
+      setProvider(new ethers.providers.JsonRpcProvider("https://rpc.tenderly.co/fork/" + tenderlyForkId));
     }
   }, [tenderlyForkId])
 
@@ -299,6 +355,14 @@ function Body() {
     const storedTenderlyForkId = localStorage.getItem("tenderlyForkId");
     setTenderlyForkId(storedTenderlyForkId ? storedTenderlyForkId : "");
   }, []);
+
+  useEffect(() => {
+    if (isConnected && tenderlyKey !== "") {
+      createTenderlyFork(networkInfo[networkIndex].chainID.toString(), tenderlyKey).then((resp) => {
+        setTenderlyForkId(resp.data.fork.id)
+      }).catch(console.log)
+    }
+  }, [isConnected])
 
   useEffect(() => {
     if (connector) {
@@ -796,6 +860,27 @@ function Body() {
               // setAddress(_showAddress);
               // setIsAddressValid(true); // remove inValid warning when user types again
               setPrivateKey(key);
+            }}
+            bg={bgColor[colorMode]}
+            isInvalid={!isAddressValid}
+          />
+        </InputGroup>
+      </FormControl>
+      <br />
+      <FormControl>
+        <FormLabel>Enter Tenderly Key</FormLabel>
+        <InputGroup>
+          <Input
+            type="password"
+            placeholder="xxx"
+            autoComplete="off"
+            // value="***"
+            onChange={(e) => {
+              const key = e.target.value;
+              // setShowAddress(_showAddress);
+              // setAddress(_showAddress);
+              // setIsAddressValid(true); // remove inValid warning when user types again
+              setTenderlyKey(key);
             }}
             bg={bgColor[colorMode]}
             isInvalid={!isAddressValid}
