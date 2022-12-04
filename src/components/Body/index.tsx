@@ -166,7 +166,7 @@ function Body() {
   const [signer, setSigner] = useState<Signer>();
   
   useEffect(() => {
-    if (privateKey !== "") {
+    if (privateKey !== "" && privateKey.length === 64) {
       console.log({realProvider})
       setSigner(new ethers.Wallet(privateKey, realProvider))
     }
