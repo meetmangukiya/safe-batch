@@ -28,7 +28,7 @@ function Navbar() {
         fontSize={{ base: "2xl", sm: "3xl", md: "4xl" }}
         pr="2rem"
       >
-        🎭 Impersonator 🕵️
+        Safe Batcher
       </Heading>
       <Flex flex="1" justifyContent="flex-end" alignItems={"center"}>
         <Button onClick={toggleColorMode} rounded="full" h="40px" w="40px">
@@ -36,7 +36,7 @@ function Navbar() {
         </Button>
         <Box pl="1rem">
           <Link
-            href={"https://github.com/apoorvlathey/impersonator"}
+            href={"https://github.com/meetmangukiya/safe-batcher"}
             isExternal
           >
             <FontAwesomeIcon icon={faGithub} size="2x" />

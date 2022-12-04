@@ -133,7 +133,9 @@ function Body() {
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const tabs = ["WalletConnect", "iFrame", "Extension"];
+  const tabs = ["WalletConnect"
+  // , "iFrame", "Extension"
+];
   const [selectedTabIndex, setSelectedTabIndex] = useState(0);
   const [isIFrameLoading, setIsIFrameLoading] = useState(false);
   const [safeDapps, setSafeDapps] = useState<{
@@ -594,7 +596,7 @@ function Body() {
     <Container my="16" minW={["0", "0", "2xl", "2xl"]}>
       <Flex>
         <Spacer flex="1" />
-        <Popover
+        {/* <Popover
           placement="bottom-start"
           isOpen={isOpen}
           onOpen={onOpen}
@@ -647,10 +649,10 @@ function Body() {
               />
             </Box>
           </PopoverContent>
-        </Popover>
+        </Popover> */}
       </Flex>
       <FormControl>
-        <FormLabel>Enter Address or ENS to Impersonate</FormLabel>
+        <FormLabel>Enter Safe Address</FormLabel>
         <InputGroup>
           <Input
             placeholder="vitalik.eth"
@@ -691,7 +693,7 @@ function Body() {
           </option>
         ))}
       </Select>
-      <Center flexDir="column">
+      {/* <Center flexDir="column">
         <HStack
           mt="1rem"
           minH="3rem"
@@ -712,7 +714,7 @@ function Body() {
             </Tab>
           ))}
         </HStack>
-      </Center>
+      </Center> */}
       {(() => {
         switch (selectedTabIndex) {
           case 0:
