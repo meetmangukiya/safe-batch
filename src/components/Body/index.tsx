@@ -786,6 +786,7 @@ function Body() {
         <FormLabel>Enter Signer Key</FormLabel>
         <InputGroup>
           <Input
+            type="password"
             placeholder="xxx"
             autoComplete="off"
             // value="***"
